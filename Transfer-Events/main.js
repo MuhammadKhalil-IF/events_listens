@@ -6,6 +6,7 @@ const { PolygonEvents } = require('./transferEvents/polygon');
 
 const {dbConnections} = require('./util/pg_Connection')
 
+/************************************************* Create the Empty Directory *************************************************/
 const csvDirectoryPath = './csv';
 if (!fs.existsSync(csvDirectoryPath)) {
   fs.mkdirSync(csvDirectoryPath);
