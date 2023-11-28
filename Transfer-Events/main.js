@@ -16,7 +16,7 @@ if (!fs.existsSync(csvDirectoryPath)) {
 async function main() {
   await dbConnections();
   await ethereumEvents();
-  // await PolygonEvents();
+  await PolygonEvents();
   
 }
 

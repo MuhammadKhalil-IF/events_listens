@@ -8,9 +8,8 @@ const contract = new web3.eth.Contract(polygonContractABI, polygonContractAddres
 async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
   let from = fromBlock;
   const csvData = [];
-
   try {
-    const idMap = new Map(); // To store the last occurrence of each ID
+    const idMap = new Map();
 
     while (from <= latestBlock) {
       const to = Math.min(from + chunkSize - 1, latestBlock);
@@ -18,11 +17,8 @@ async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
         fromBlock: from,
         toBlock: to,
       });
-
       for (const event of events) {
         const tokenId = event.returnValues.tokenId;
-
-        // Update the last occurrence of each ID
         idMap.set(tokenId, {
           token_id: tokenId,
           from_address: event.returnValues.from,
@@ -33,12 +29,9 @@ async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
       console.log(`Processed events from block ${from} to block ${to}. Total events: ${idMap.size}`);
       from += chunkSize;
     }
-
-    // Store the last occurrence of each ID in csvData
     for (const idData of idMap.values()) {
       csvData.push(idData);
     }
-
     return csvData;
   } catch (error) {
     console.error('Error fetching or storing events:', error);
