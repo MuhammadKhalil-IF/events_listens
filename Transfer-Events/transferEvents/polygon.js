@@ -1,74 +1,67 @@
 const { createAlchemyWeb3 } = require('@alch/alchemy-web3');
 const { polygonContractABI, polygonContractAddress, rpcURL } = require('../config/config');
 const {createCsvFile} =require('../util/util');
-const {insertIntoDB} = require('./util/pg_Connection')
+const {insertIntoDB}=require('../util/pg_Connection')
 const web3 = createAlchemyWeb3(rpcURL);
 const contract = new web3.eth.Contract(polygonContractABI, polygonContractAddress);
 
-async function getAllTransferEvents(fromBlock, toBlock, chunkSize = 1000) {
+async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
   let from = fromBlock;
-  const allEvents = [];
+  const csvData = [];
+
   try {
-    while (from <= toBlock) {
-      const to = Math.min(from + chunkSize - 1, toBlock);
+    const idMap = new Map(); // To store the last occurrence of each ID
+
+    while (from <= latestBlock) {
+      const to = Math.min(from + chunkSize - 1, latestBlock);
       const events = await contract.getPastEvents('Transfer', {
         fromBlock: from,
         toBlock: to,
       });
 
-      allEvents.push(...events);
-      from += chunkSize;
+      for (const event of events) {
+        const tokenId = event.returnValues.tokenId;
 
-      console.log(`Fetched events from block ${from - chunkSize} to block ${to}`);
+        // Update the last occurrence of each ID
+        idMap.set(tokenId, {
+          token_id: tokenId,
+          from_address: event.returnValues.from,
+          to_address: event.returnValues.to,
+        });
+      }
+
+      console.log(`Processed events from block ${from} to block ${to}. Total events: ${idMap.size}`);
+      from += chunkSize;
     }
-    return allEvents;
+
+    // Store the last occurrence of each ID in csvData
+    for (const idData of idMap.values()) {
+      csvData.push(idData);
+    }
+
+    return csvData;
   } catch (error) {
-    console.error('Error fetching Transfer events:', error);
+    console.error('Error fetching or storing events:', error);
     throw error;
   }
 }
 
+
 async function PolygonEvents() {
-  const fromBlock =   29653422; 
-  const latestBlock = 30200001; 
-  //   const latestBlock = await web3.eth.getBlockNumber(); 
-  const events = await getAllTransferEvents(fromBlock, latestBlock);
-  console.log(`Total events fetched: ${events.length}`);
+  const fromBlock = 29653422;
+  const latestBlock = await web3.eth.getBlockNumber();
 
-  const tokenMap = new Map();
+  const csvData = await fetchAndStoreEvents(fromBlock, latestBlock);
 
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i];
-    const tokenId = event.returnValues.tokenId;
-
-    if (!tokenMap.has(tokenId)) {
-      tokenMap.set(tokenId, {
-        token_id: tokenId,
-        from_address: event.address,
-        to_address: event.returnValues.to,
-        blockNumber: event.blockNumber,
-      });
-    }
+  if (csvData.length > 0) {
+    const fields = ['token_id', 'from_address', 'to_address'];
+    createCsvFile(csvData, fields, `polygonEventListen_${fromBlock}_${latestBlock}`);
+    insertIntoDB(csvData, "polygon_events");
+    console.log(`CSV File Created Successfully for range ${fromBlock} to ${latestBlock}. Total events: ${csvData.length}`);
+  } else {
+    console.log(`No events found for the entire range from ${fromBlock} to ${latestBlock}`);
   }
-
-  const csvData = Array.from(tokenMap.values())
-  .map(event => ({
-    token_id: event.token_id,
-    from_address: event.from_address,
-    to_address: event.to_address,
-  }));
-
-
-
-  const fields = ['token_id', 'from_address', 'to_address'];
-  insertIntoDB( csvData,"polygon_events")
-  createCsvFile(csvData, fields, 'polygonEventListen');
-
-
 }
-
-
-
 
 module.exports = {
   PolygonEvents,

@@ -1,58 +1,58 @@
-const { createAlchemyWeb3 } = require('@alch/alchemy-web3');
-const { polygonContractABI, polygonContractAddress, rpcURL } = require('../config/config');
+async function listenAndStoreEvents(fromBlock, chunkSize = 10000) {
+  const latestBlock = await web3.eth.getBlockNumber();
+  let currentBlock = fromBlock;
 
-const web3 = createAlchemyWeb3(rpcURL);
-const contract = new web3.eth.Contract(polygonContractABI, polygonContractAddress);
+  while (currentBlock <= latestBlock) {
+    const toBlock = Math.min(currentBlock + chunkSize - 1, latestBlock);
+    const events = await getAllTransferEvents(currentBlock, toBlock);
+    await storeEventsInDB(events);
 
-async function getAllTransferEvents(fromBlock, toBlock, chunkSize = 1000) {
-  let from = fromBlock;
-  const allEvents = [];
+    console.log(`Processed events from block ${currentBlock} to ${toBlock}`);
+    currentBlock += chunkSize;
+  }
+}
 
-  try {
-    const promises = [];
+async function getAllTransferEvents(fromBlock, toBlock) {
+  const events = await contract.getPastEvents('Transfer', {
+    fromBlock: fromBlock,
+    toBlock: toBlock,
+  });
+  return events;
+}
 
-    while (from <= toBlock) {
-      const to = Math.min(from + chunkSize - 1, toBlock);
-      const eventsPromise = contract.getPastEvents('Transfer', {
-        fromBlock: from,
-        toBlock: to,
-      });
+async function storeEventsInDB(events) {
+  const tokenMap = new Map();
 
-      promises.push(eventsPromise);
-      from += chunkSize;
-    }
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    const tokenId = event.returnValues.tokenId;
 
-    const eventChunks = await Promise.all(promises);
-    eventChunks.forEach(events => {
-      const transferEvents = events.map(event => ({
-        token_id: event.returnValues.tokenId,
+    if (!tokenMap.has(tokenId)) {
+      tokenMap.set(tokenId, {
+        token_id: tokenId,
         from_address: event.address,
         to_address: event.returnValues.to,
         blockNumber: event.blockNumber,
-      }));
-      allEvents.push(...transferEvents);
-    });
+      });
+    }
+  }
 
-    console.log(`Total events fetched: ${allEvents.length}`);
-    return allEvents;
+  const eventData = Array.from(tokenMap.values()).map(event => ({
+    token_id: event.token_id,
+    from_address: event.from_address,
+    to_address: event.to_address,
+    blockNumber: event.blockNumber,
+  }));
+
+  try {
+    // Insert eventData into the database using your DB insertion method
+    await insertIntoDB(eventData, 'polygon_events');
   } catch (error) {
-    console.error('Error fetching Transfer events:', error);
+    console.error('Error storing events in the database:', error);
     throw error;
   }
 }
 
-async function PolygonEvents() {
-  const fromBlock = 29653422; 
-  const latestBlock = await web3.eth.getBlockNumber(); 
-
-  const events = await getAllTransferEvents(fromBlock, latestBlock);
-  return events;
-}
-
-
-
-
-PolygonEvents();
-// module.exports = {
-//   PolygonEvents,
-// };
+// Usage
+const fromBlock = 29653422;
+listenAndStoreEvents(fromBlock, 10000); // Start fetching events in chunks of 10,000
