@@ -1,3 +1,4 @@
+
 const { ethers } = require("ethers");
 const { createCsvFile } = require('../util/util');
 const {insertIntoDB}=require('../util/pg_Connection')
@@ -54,6 +55,8 @@ async function ethereumEvents() {
       console.error('Error fetching Transfer events:', error);
     }
   }
+
+
   
 
 module.exports = {

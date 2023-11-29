@@ -8,9 +8,9 @@ const contract = new web3.eth.Contract(polygonContractABI, polygonContractAddres
 async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
   let from = fromBlock;
   const csvData = [];
+
   try {
     const idMap = new Map();
-
     while (from <= latestBlock) {
       const to = Math.min(from + chunkSize - 1, latestBlock);
       const events = await contract.getPastEvents('Transfer', {
@@ -19,13 +19,21 @@ async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
       });
       for (const event of events) {
         const tokenId = event.returnValues.tokenId;
+        if (idMap.has(tokenId)) {
         idMap.set(tokenId, {
           token_id: tokenId,
-          from_address: event.returnValues.from,
+          from_address: event.address,
           to_address: event.returnValues.to,
         });
       }
-
+      else {
+        idMap.set(tokenId, {
+          token_id: tokenId,
+          from_address: event.address,
+          to_address: event.returnValues.to,
+        });
+      }
+    }
       console.log(`Processed events from block ${from} to block ${to}. Total events: ${idMap.size}`);
       from += chunkSize;
     }
@@ -43,12 +51,12 @@ async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
 async function PolygonEvents() {
   const fromBlock = 29653422;
   const latestBlock = await web3.eth.getBlockNumber();
-
+  // const latestBlock = 30200001;
   const csvData = await fetchAndStoreEvents(fromBlock, latestBlock);
 
   if (csvData.length > 0) {
     const fields = ['token_id', 'from_address', 'to_address'];
-    createCsvFile(csvData, fields, `polygonEventListen_${fromBlock}_${latestBlock}`);
+    createCsvFile(csvData, fields, `PolygonEventListen`);
     insertIntoDB(csvData, "polygon_events");
     console.log(`CSV File Created Successfully for range ${fromBlock} to ${latestBlock}. Total events: ${csvData.length}`);
   } else {
