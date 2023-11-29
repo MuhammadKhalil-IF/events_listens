@@ -3,6 +3,12 @@ const { polygonContractABI, polygonContractAddress, rpcURL } = require('../confi
 const {createCsvFile} =require('../util/util');
 const {insertIntoDB}=require('../util/pg_Connection')
 const web3 = createAlchemyWeb3(rpcURL);
+
+
+const { parse } = require("csv-parse");
+const fs = require('fs');
+const path = require('path');
+
 const contract = new web3.eth.Contract(polygonContractABI, polygonContractAddress);
 
 async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
@@ -64,9 +70,27 @@ async function PolygonEvents() {
   }
 }
 
-module.exports = {
-  PolygonEvents,
-};
+
+
+
+/******************** Read CSV FIle *********************/
+async function callingTokenUri() {
+  try {
+    const path = '../csv/polygonEventListen.csv';
+    const valuesAtIndex0 = await readCsvFile(path);
+    console.log(valuesAtIndex0);
+    console.log(valuesAtIndex0.length);
+  } catch (error) {
+    console.error("Error fetching token URI:", error);
+  }
+}
+
+
+
+callingTokenUri()
+// module.exports = {
+//   PolygonEvents,
+// };
 
 
 

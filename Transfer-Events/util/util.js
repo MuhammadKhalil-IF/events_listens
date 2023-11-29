@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parseAsync } = require('json2csv');
+const { parse } = require("csv-parse");
 
 function createCsvFile(data, fields, fileName) {
   const jsonData = JSON.stringify(data, null, 2);
@@ -27,6 +28,27 @@ function createCsvFile(data, fields, fileName) {
 }
 
 
+
+function readCsvFile(path) {
+  return new Promise((resolve, reject) => {
+    const firstColumnValues = [];
+
+    fs.createReadStream(path)
+      .pipe(parse({ delimiter: ',' }))
+      .on('data', function (row) {
+        if (row && row.length > 0) {
+          firstColumnValues.push(row[0].trim()); 
+        }
+      })
+      .on('end', function () {
+        resolve(firstColumnValues); 
+      })
+      .on('error', function (error) {
+        reject(error); 
+      });
+  });
+}
 module.exports = {
-  createCsvFile
+  createCsvFile,
+  readCsvFile
 };

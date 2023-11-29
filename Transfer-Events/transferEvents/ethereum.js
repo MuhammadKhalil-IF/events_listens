@@ -1,11 +1,10 @@
 
 const { ethers } = require("ethers");
-const { createCsvFile } = require('../util/util');
+const { createCsvFile,readCsvFile } = require('../util/util');
 const {insertIntoDB}=require('../util/pg_Connection')
 const { EthContractABI, EthContractAddress } = require('../config/config');
 const provider = new ethers.providers.JsonRpcProvider("https://eth-mainnet.g.alchemy.com/v2/DYuH74SNIuDXG6YYdE1tV-5gohEkVAs-");
 const contract = new ethers.Contract(EthContractAddress, EthContractABI, provider);
-
 
 /************************************************* Events Listener *************************************************/
 async function ethereumEvents() {
@@ -57,8 +56,99 @@ async function ethereumEvents() {
   }
 
 
-  
 
-module.exports = {
-  ethereumEvents
-};
+
+/******************** Get the token-Uri *********************/
+
+async function tokenIds() {
+  try {
+    const path = '../csv/ganda.csv';
+    const valuesAtIndex0 = await readCsvFile(path);
+    const numbersArray = valuesAtIndex0.map((str) => Number(str));
+    if (isNaN(numbersArray[0])) {
+      numbersArray.shift(); 
+    }
+    // console.log(numbersArray)
+    return numbersArray;
+  } catch (error) {
+    console.error("Error fetching token URI:", error);
+  }
+}
+
+// function extractNumber(){
+// var txt = "#div-name-1234-characteristic:561613213213";
+// var numb = txt.match(/\d/g);
+// numb = numb.join("");
+// console.log(numb);
+// }
+
+async function hitAPis() {
+  try {
+    const base = "https://api.cryptoverse.biz/metadata/";
+    const tokensIds = await tokenIds();
+
+    const extractedData = await Promise.all(tokensIds.map(async (tokenID, index) => {
+      if (!isNaN(tokenID)) {
+        const url = base + tokenID;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          const data = await response.json();
+          const { name, image, attributes } = data;
+          const extractedObject = {
+            name,
+            image,
+            Zone: null,
+            Size: null,
+            Type: null,
+            POI: []
+          };
+
+          attributes.forEach(attribute => {
+            const { trait_type, value } = attribute;
+            if (trait_type === 'Zone') {
+              extractedObject.Zone = value;
+            } else if (trait_type === 'Size') {
+              extractedObject.Size = value;
+            } else if (trait_type === 'Type') {
+              extractedObject.Type = value;
+            } else if (trait_type === 'POI') {
+              extractedObject.POI.push(value);
+            }
+          });
+
+          return extractedObject;
+        } catch  {
+          console.log(`Error fetching token metadata for ID ${tokenID}:`);
+          return null;
+        }
+      } else {
+        console.warn(`Invalid ID at index ${index}: ${tokenID}`);
+        return null;
+      }
+    }));
+
+    const filteredData = extractedData.filter(item => item !== null);
+    console.log(filteredData);
+    return filteredData;
+  } catch (error) {
+    console.error("Error fetching token metadata:", error);
+    return [];
+  }
+}
+
+
+
+
+
+
+
+
+
+  tokenIds();
+  hitAPis()
+// module.exports = {
+//   ethereumEvents
+// };
