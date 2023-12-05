@@ -24,7 +24,7 @@ async function dbConnections() {
   
 }
 
-/************************************************* Insertion *************************************************/
+/************************************************ Insertion ***********************************************/
 async function insertIntoDB(eventslogs,tableName) {
   try {
     await client.query('BEGIN');
@@ -42,7 +42,7 @@ async function insertIntoDB(eventslogs,tableName) {
   }
 }
 
-/************************************************* Update  *************************************************/
+/************************************************* Update  ************************************************/
 async function updateData(eventslogs, tableName) {
   try {
     await client.query('BEGIN');
@@ -73,7 +73,7 @@ async function updateData(eventslogs, tableName) {
   }
 }
 
-/************************************************* getTokenIdsFromTable  *************************************************/
+/********************************************* getTokenIdsFromTable  ***************************************/
 async function getTokenIdsFromTable(tableName) {
   try {
     await client.query('BEGIN');
@@ -89,7 +89,7 @@ async function getTokenIdsFromTable(tableName) {
     throw error;
   }
 }
-/************************************************* getAllData  *************************************************/
+/*********************************************** getAllData  ***********************************************/
 
 async function getAllData(tableName) {
   try {
@@ -108,8 +108,7 @@ async function getAllData(tableName) {
 
 
 
-
-/************************************************* READ the CSV *************************************************/
+/************************************************ READ the CSV *********************************************/
 function readCsvFile(filePath) {
   return new Promise((resolve, reject) => {
     const sizeAndTokenIds = [];
@@ -135,8 +134,8 @@ function readCsvFile(filePath) {
       });
   });
 }
-/************************************************* Update single column Excel *************************************************/
-async function updateData(tableName, filePath) {
+/****************************************** Update single column Excel *************************************/
+async function excelDataToDB(tableName, filePath) {
   try {
     const eventslogs = await readCsvFile(filePath); // Read CSV file
     await client.query('BEGIN');
@@ -165,27 +164,15 @@ async function updateData(tableName, filePath) {
 
 
 
-// dbConnections()
-//   .then(async () => {
-//     try {
-//       await updateData('polygon_events', '../csv/lands_data.csv');
-//       console.log('Update completed successfully');
-//     } catch (error) {
-//       console.error('Error during update:', error);
-//     } finally {
-//       await client.end();
-//     }
-//   })
-//   .catch((error) => {
-//     console.error('Error establishing database connection:', error);
-//   });
 
 
 module.exports = {
+  client,
   dbConnections,
   getTokenIdsFromTable,
   insertIntoDB,
   updateData,
+  excelDataToDB,
   getAllData,
   
 };

@@ -26,7 +26,6 @@ async function createCsvFile(data, fields, fileName) {
 }
 
 /************************************************* Merge the CSV *************************************************/
-
 async function generateCSVFromDB(tableName, fileName) {
   try {
     const dataFromDB = await getAllData(tableName);
@@ -38,16 +37,48 @@ async function generateCSVFromDB(tableName, fileName) {
   }
 }
 
+/************************************************* READ the CSV *************************************************/
+function readCsvFile(filePath) {
+  return new Promise((resolve, reject) => {
+    const sizeAndTokenIds = [];
+    let isFirstRow = true;
+    fs.createReadStream(filePath)
+      .pipe(parse({ delimiter: ',' }))
+      .on('data', function (row) {
+        if (isFirstRow) {
+          isFirstRow = false;
+          return;
+        }
 
+        const size = row[10] ? row[10].trim() : ''; 
+        const token_id = row[12] ? row[12].trim() : ''; 
 
-async function getData(){
-  await dbConnections();
-  await generateCSVFromDB("ethereum_events","EthereumFetchFromDB");
-  await generateCSVFromDB("polygon_events","PolygonFetchFromDB");
+        sizeAndTokenIds.push({ size, token_id });
+      })
+      .on('end', function () {
+        resolve(sizeAndTokenIds);
+      })
+      .on('error', function (error) {
+        reject(error);
+      });
+  });
 }
 
 
-getData()
+
+/***
+ * if the data from event $ from the apis properly fetched then you can just execute these 5 line to make csvs with database tables fields
+ * 
+ * async function getData(){
+ * await dbConnections();
+ * await generateCSVFromDB("ethereum_events","EthereumFetchFromDB");
+ * await generateCSVFromDB("polygon_events","PolygonFetchFromDB");
+ *  }
+ * 
+ * 
+ */
+
+
 module.exports = {
   createCsvFile,
   generateCSVFromDB
