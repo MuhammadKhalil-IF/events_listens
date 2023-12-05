@@ -1,7 +1,8 @@
 
 const { ethers } = require("ethers");
-const { createCsvFile,readCsvFile } = require('../util/util');
-const {insertIntoDB}=require('../util/pg_Connection')
+const { createCsvFile,generateCSVFromDB } = require('../util/csvUtil');
+const { apiResponses } =require('../util/metaData')
+const { insertIntoDB }=require('../util/pg_Connection')
 const { EthContractABI, EthContractAddress } = require('../config/config');
 const provider = new ethers.providers.JsonRpcProvider("https://eth-mainnet.g.alchemy.com/v2/DYuH74SNIuDXG6YYdE1tV-5gohEkVAs-");
 const contract = new ethers.Contract(EthContractAddress, EthContractABI, provider);
@@ -12,7 +13,9 @@ async function ethereumEvents() {
       const events = await contract.queryFilter("Transfer");
       const filteredEventsMap = new Map();
       const multipleOccurrenceIds = new Map();
-      events.forEach(event => {
+      
+     for (let i = 0; i < events.length; i++){
+        const event=events[i];
         const args = event.args;
         let decimalValue = null;
         if (args && Array.isArray(args)) {
@@ -28,7 +31,7 @@ async function ethereumEvents() {
           token_id: decimalValue,
           from_address: event.address,
           to_address: toAddress,
-          blockNumber: event.blockNumber,
+          // blockNumber: event.blockNumber,
         };
         if (filteredEventsMap.has(decimalValue)) {
           if (!multipleOccurrenceIds.has(decimalValue)) {
@@ -37,118 +40,40 @@ async function ethereumEvents() {
           multipleOccurrenceIds.get(decimalValue).push(currentEvent);
         }
         filteredEventsMap.set(decimalValue, currentEvent);
-      });
+      }
+    
   
       const filteredEvents = Array.from(filteredEventsMap.values());
+      // console.log("********FILTERED EVENTS RESPONSE *********",filteredEvents);
+
+      // const multipleOccurrences = Array.from(multipleOccurrenceIds.values())
+      //   .filter(events => events.length > 1);
+      // console.log("IDs occurring multiple times:", multipleOccurrences);
+
+      await  insertIntoDB(filteredEvents, "ethereum_events");
+      // const fields = ['token_id', 'from_address', 'to_address'];
+      // await createCsvFile(filteredEvents, fields, 'ethereumEventListen');
+
+      return filteredEvents;
       
-  
-      const multipleOccurrences = Array.from(multipleOccurrenceIds.values())
-        .filter(events => events.length > 1);
-      
-      console.log("IDs occurring multiple times:", multipleOccurrences);
-      insertIntoDB(filteredEvents, "ethereum_events");
-      const fields = ['token_id', 'from_address', 'to_address'];
-      createCsvFile(filteredEvents, fields, 'ethereumEventListen');
-      console.log("*********** ENDED ************")
     } catch (error) {
       console.error('Error fetching Transfer events:', error);
     }
-  }
-
-
-
-
-/******************** Get the token-Uri *********************/
-
-async function tokenIds() {
-  try {
-    const path = '../csv/ganda.csv';
-    const valuesAtIndex0 = await readCsvFile(path);
-    const numbersArray = valuesAtIndex0.map((str) => Number(str));
-    if (isNaN(numbersArray[0])) {
-      numbersArray.shift(); 
-    }
-    // console.log(numbersArray)
-    return numbersArray;
-  } catch (error) {
-    console.error("Error fetching token URI:", error);
-  }
 }
 
-// function extractNumber(){
-// var txt = "#div-name-1234-characteristic:561613213213";
-// var numb = txt.match(/\d/g);
-// numb = numb.join("");
-// console.log(numb);
-// }
-
-async function hitAPis() {
+/******************** Root of Ethereum*********************/
+async function ethereum() {
   try {
-    const base = "https://api.cryptoverse.biz/metadata/";
-    const tokensIds = await tokenIds();
-
-    const extractedData = await Promise.all(tokensIds.map(async (tokenID, index) => {
-      if (!isNaN(tokenID)) {
-        const url = base + tokenID;
-        try {
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          const data = await response.json();
-          const { name, image, attributes } = data;
-          const extractedObject = {
-            name,
-            image,
-            Zone: null,
-            Size: null,
-            Type: null,
-            POI: []
-          };
-
-          attributes.forEach(attribute => {
-            const { trait_type, value } = attribute;
-            if (trait_type === 'Zone') {
-              extractedObject.Zone = value;
-            } else if (trait_type === 'Size') {
-              extractedObject.Size = value;
-            } else if (trait_type === 'Type') {
-              extractedObject.Type = value;
-            } else if (trait_type === 'POI') {
-              extractedObject.POI.push(value);
-            }
-          });
-
-          return extractedObject;
-        } catch  {
-          console.log(`Error fetching token metadata for ID ${tokenID}:`);
-          return null;
-        }
-      } else {
-        console.warn(`Invalid ID at index ${index}: ${tokenID}`);
-        return null;
-      }
-    }));
-
-    const filteredData = extractedData.filter(item => item !== null);
-    console.log(filteredData);
-    return filteredData;
+    await ethereumEvents();
+    await apiResponses("ethereum_events");
+    await generateCSVFromDB("ethereum_events","EthereumFetchFromDB");
   } catch (error) {
-    console.error("Error fetching token metadata:", error);
-    return [];
+    console.error('Error in ethereum function:', error);
   }
 }
 
 
 
-
-
-
-
-
-
-  tokenIds();
-  hitAPis()
-// module.exports = {
-//   ethereumEvents
-// };
+module.exports = {
+        ethereum
+};

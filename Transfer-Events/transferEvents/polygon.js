@@ -1,13 +1,9 @@
 const { createAlchemyWeb3 } = require('@alch/alchemy-web3');
 const { polygonContractABI, polygonContractAddress, rpcURL } = require('../config/config');
-const {createCsvFile} =require('../util/util');
+const {createCsvFile,generateCSVFromDB} =require('../util/csvUtil');
+const { apiResponses } =require('../util/metaData')
 const {insertIntoDB}=require('../util/pg_Connection')
 const web3 = createAlchemyWeb3(rpcURL);
-
-
-const { parse } = require("csv-parse");
-const fs = require('fs');
-const path = require('path');
 
 const contract = new web3.eth.Contract(polygonContractABI, polygonContractAddress);
 
@@ -57,40 +53,33 @@ async function fetchAndStoreEvents(fromBlock, latestBlock, chunkSize = 10000) {
 async function PolygonEvents() {
   const fromBlock = 29653422;
   const latestBlock = await web3.eth.getBlockNumber();
-  // const latestBlock = 30200001;
   const csvData = await fetchAndStoreEvents(fromBlock, latestBlock);
 
   if (csvData.length > 0) {
     const fields = ['token_id', 'from_address', 'to_address'];
-    createCsvFile(csvData, fields, `PolygonEventListen`);
-    insertIntoDB(csvData, "polygon_events");
+    // await createCsvFile(csvData, fields, `PolygonEventListen`);
+    await insertIntoDB(csvData, "polygon_events");
     console.log(`CSV File Created Successfully for range ${fromBlock} to ${latestBlock}. Total events: ${csvData.length}`);
+    return csvData;
   } else {
     console.log(`No events found for the entire range from ${fromBlock} to ${latestBlock}`);
   }
 }
 
-
-
-
-/******************** Read CSV FIle *********************/
-async function callingTokenUri() {
+/******************** Root of polygon*********************/
+async function polygon() {
   try {
-    const path = '../csv/polygonEventListen.csv';
-    const valuesAtIndex0 = await readCsvFile(path);
-    console.log(valuesAtIndex0);
-    console.log(valuesAtIndex0.length);
+    await PolygonEvents();
+    await apiResponses("polygon_events");
+    await generateCSVFromDB("polygon_events","PolygonFetchFromDB");
   } catch (error) {
-    console.error("Error fetching token URI:", error);
+    console.error('Error in polygon function:', error);
   }
 }
 
-
-
-callingTokenUri()
-// module.exports = {
-//   PolygonEvents,
-// };
+module.exports = {
+  polygon,
+};
 
 
 
